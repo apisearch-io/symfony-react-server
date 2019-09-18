@@ -26,6 +26,7 @@ namespace Apisearch\SymfonyReactServer;
  * @author Marc Morera <yuhu@mmoreram.com>
  */
 
+use Narrowspark\MimeType\MimeTypeFileExtensionGuesser;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Filesystem\FilesystemInterface;
 use React\Promise;
@@ -175,7 +176,7 @@ class RequestHandler
                     new \React\Http\Response(
                         200,
                         [
-                            'Content-Type' => mime_content_type($rootPath . $resourcePath)
+                            'Content-Type' => MimeTypeFileExtensionGuesser::guess($rootPath . $resourcePath)
                         ],
                         $contents
                     ),
