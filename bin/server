@@ -62,8 +62,28 @@ function requireIfExists(string $file)
     return null;
 }
 
+function initializeWatcher(\React\EventLoop\LoopInterface $loop, \Apisearch\SymfonyReactServer\Application $application) {
+    $watchList = new \seregazhuk\PhpWatcher\Config\WatchList(['config', 'src'], ['php', 'yml', 'yaml', 'xml']);
+    $output = new Symfony\Component\Console\Style\SymfonyStyle(
+        new \Symfony\Component\Console\Input\ArgvInput(),
+        new \Symfony\Component\Console\Output\ConsoleOutput()
+    );
+    $screen = new \seregazhuk\PhpWatcher\Screen\Screen($output);
+    $screen->showSpinner($loop);
+    $filesystemListener = new seregazhuk\PhpWatcher\Filesystem\ChangesListener($loop, $watchList);
+
+    $filesystemListener->on('change', static function () use ($application, $screen) {
+        $screen->restarting();
+        $application->stop();
+        $application->run();
+    });
+
+    $filesystemListener->start();
+}
+
 use Apisearch\SymfonyReactServer\Adapter\KernelAdapter;
 use Apisearch\SymfonyReactServer\Adapter\Symfony4KernelAdapter;
+use React\EventLoop\Factory as EventLoopFactory;
 
 /**
  * Server.
@@ -102,6 +122,8 @@ if (!is_a($adapter, KernelAdapter::class, true)) {
     die('You must define an existing kernel adapter, or by an alias or my a namespace. This class MUST implement KernelAdapter' . PHP_EOL);
 }
 
+$loop = EventLoopFactory::create();
+
 $application = new \Apisearch\SymfonyReactServer\Application(
     $rootPath,
     $host,
@@ -112,7 +134,13 @@ $application = new \Apisearch\SymfonyReactServer\Application(
     $nonBlocking,
     $adapter,
     $bootstrapFile,
-    $staticFolder
+    $staticFolder,
+    $loop
 );
 
+if ($environment === 'dev') {
+    initializeWatcher($loop, $application);
+}
+
 $application->run();
+$loop->run();

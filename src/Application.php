@@ -18,7 +18,7 @@ namespace Apisearch\SymfonyReactServer;
 use Apisearch\SymfonyReactServer\Adapter\KernelAdapter;
 use Exception;
 use Psr\Http\Message\ServerRequestInterface;
-use React\EventLoop\Factory as EventLoopFactory;
+use React\EventLoop\LoopInterface;
 use React\Filesystem\Filesystem;
 use React\Http\Server as HttpServer;
 use React\Promise\Promise;
@@ -85,6 +85,11 @@ class Application
     private $staticFolder;
 
     /**
+     * @var LoopInterface
+     */
+    private $loop;
+
+    /**
      * @var Kernel
      *
      * Kernel
@@ -114,6 +119,7 @@ class Application
      * @param string $adapter
      * @param string $bootstrapFile
      * @param string|null $staticFolder
+     * @param LoopInterface $loop
      *
      * @throws Exception
      */
@@ -127,7 +133,8 @@ class Application
         bool $nonBlocking,
         string $adapter,
         string $bootstrapFile,
-        ?string $staticFolder
+        ?string $staticFolder,
+        LoopInterface $loop
     )
     {
         $this->rootPath = $rootPath;
@@ -139,6 +146,7 @@ class Application
         $this->nonBlocking = $nonBlocking;
         $this->adapter = $adapter;
         $this->bootstrapFile = $bootstrapFile;
+        $this->loop = $loop;
 
         ErrorHandler::handle();
         if ($this->debug) {
@@ -179,9 +187,8 @@ class Application
         /**
          * REACT SERVER.
          */
-        $loop = EventLoopFactory::create();
-        $this->socket = new SocketServer($this->host . ':' . $this->port, $loop);
-        $filesystem = Filesystem::create($loop);
+        $this->socket = new SocketServer($this->host . ':' . $this->port, $this->loop);
+        $filesystem = Filesystem::create($this->loop);
         $requestHandler = new RequestHandler();
         $this->kernel->boot();
 
@@ -189,7 +196,7 @@ class Application
             $this
                 ->kernel
                 ->getContainer()
-                ->set('reactphp.event_loop', $loop);
+                ->set('reactphp.event_loop', $this->loop);
         }
 
         if (!$this->silent) {
@@ -197,8 +204,8 @@ class Application
         }
 
         $this->http = new HttpServer(
-            function (ServerRequestInterface $request) use ($requestHandler, $filesystem, $loop) {
-                return new Promise(function (Callable $resolve) use ($request, $requestHandler, $filesystem, $loop) {
+            function (ServerRequestInterface $request) use ($requestHandler, $filesystem) {
+                return new Promise(function (Callable $resolve) use ($request, $requestHandler, $filesystem) {
 
                     $resolveResponseCallback = function(ServerResponseWithMessage $serverResponseWithMessage) use ($resolve) {
                         if (!$this->silent) {
@@ -216,7 +223,7 @@ class Application
                         $this->staticFolder
                     ) === 0) {
                         $requestHandler->handleStaticResource(
-                            $loop,
+                            $this->loop,
                             $filesystem,
                             $this->rootPath,
                             $uriPath
@@ -246,7 +253,6 @@ class Application
         });
 
         $this->http->listen($this->socket);
-        $loop->run();
     }
 
     public function stop()
