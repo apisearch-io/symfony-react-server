@@ -197,8 +197,8 @@ class Application
         }
 
         $this->http = new HttpServer(
-            function (ServerRequestInterface $request) use ($requestHandler, $filesystem) {
-                return new Promise(function (Callable $resolve) use ($request, $requestHandler, $filesystem) {
+            function (ServerRequestInterface $request) use ($requestHandler, $filesystem, $loop) {
+                return new Promise(function (Callable $resolve) use ($request, $requestHandler, $filesystem, $loop) {
 
                     $resolveResponseCallback = function(ServerResponseWithMessage $serverResponseWithMessage) use ($resolve) {
                         if (!$this->silent) {
@@ -216,6 +216,7 @@ class Application
                         $this->staticFolder
                     ) === 0) {
                         $requestHandler->handleStaticResource(
+                            $loop,
                             $filesystem,
                             $this->rootPath,
                             $uriPath
