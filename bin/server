@@ -62,27 +62,9 @@ function requireIfExists(string $file)
     return null;
 }
 
-function initializeWatcher(\React\EventLoop\LoopInterface $loop, \Apisearch\SymfonyReactServer\Application $application) {
-    $watchList = new \seregazhuk\PhpWatcher\Config\WatchList(['config', 'src'], ['php', 'yml', 'yaml', 'xml']);
-    $output = new Symfony\Component\Console\Style\SymfonyStyle(
-        new \Symfony\Component\Console\Input\ArgvInput(),
-        new \Symfony\Component\Console\Output\ConsoleOutput()
-    );
-    $screen = new \seregazhuk\PhpWatcher\Screen\Screen($output);
-    $screen->showSpinner($loop);
-    $filesystemListener = new seregazhuk\PhpWatcher\Filesystem\ChangesListener($loop, $watchList);
-
-    $filesystemListener->on('change', static function () use ($application, $screen) {
-        $screen->restarting();
-        $application->stop();
-        $application->run();
-    });
-
-    $filesystemListener->start();
-}
-
 use Apisearch\SymfonyReactServer\Adapter\KernelAdapter;
 use Apisearch\SymfonyReactServer\Adapter\Symfony4KernelAdapter;
+use Apisearch\SymfonyReactServer\ChangesWatcher;
 use React\EventLoop\Factory as EventLoopFactory;
 
 /**
@@ -138,8 +120,9 @@ $application = new \Apisearch\SymfonyReactServer\Application(
     $loop
 );
 
-if ($environment === 'dev') {
-    initializeWatcher($loop, $application);
+if ($environment === 'dev' && ChangesWatcher::isAvailable()) {
+    $watcher = new ChangesWatcher($loop);
+    $watcher->watch($application);
 }
 
 $application->run();
