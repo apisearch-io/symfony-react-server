@@ -92,6 +92,16 @@ class Application
     private $kernel;
 
     /**
+     * @var HttpServer
+     */
+    private $http;
+
+    /**
+     * @var SocketServer
+     */
+    private $socket;
+
+    /**
      * Application constructor.
      *
      * @param string $rootPath
@@ -170,7 +180,7 @@ class Application
          * REACT SERVER.
          */
         $loop = EventLoopFactory::create();
-        $socket = new SocketServer($this->host . ':' . $this->port, $loop);
+        $this->socket = new SocketServer($this->host . ':' . $this->port, $loop);
         $filesystem = Filesystem::create($loop);
         $requestHandler = new RequestHandler();
         $this->kernel->boot();
@@ -186,7 +196,7 @@ class Application
             $this->print();
         }
 
-        $http = new HttpServer(
+        $this->http = new HttpServer(
             function (ServerRequestInterface $request) use ($requestHandler, $filesystem) {
                 return new Promise(function (Callable $resolve) use ($request, $requestHandler, $filesystem) {
 
@@ -230,12 +240,20 @@ class Application
             }
         );
 
-        $http->on('error', function (\Throwable $e) {
+        $this->http->on('error', function (\Throwable $e) {
             (new ConsoleException($e, '/', 'EXC', 0))->print();
         });
 
-        $http->listen($socket);
+        $this->http->listen($this->socket);
         $loop->run();
+    }
+
+    public function stop()
+    {
+        $this->kernel->shutdown();
+        $this->http->removeAllListeners();
+        $this->socket->removeAllListeners();
+        $this->socket->close();
     }
 
     /**
